@@ -181,7 +181,7 @@ export class GolfLeagueManagerStack extends cdk.Stack {
     const corsProxyLambda = new lambda.Function(this, 'CorsProxyFunction', {
       runtime: lambda.Runtime.NODEJS_18_X,
       handler: 'index.handler',
-      code: lambda.Code.fromAsset('lambda/cors-proxy'),
+      code: lambda.Code.fromAsset('lambda/cors-proxy.zip'),
       timeout: cdk.Duration.seconds(30), // Increase timeout for proxy requests
       memorySize: 256,
     });
