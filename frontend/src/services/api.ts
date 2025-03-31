@@ -1,9 +1,13 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import { Player, Schedule, SwapRequest, AuthResponse, ApiResponse } from '../types';
 import { getSession } from './cognito';
 
 const API_URL = process.env.REACT_APP_API_URL;
 console.log('API URL:', API_URL);
+
+// Use a CORS proxy for API requests
+const CORS_PROXY = 'https://corsproxy.io/?';
+const getProxiedUrl = (url: string): string => `${CORS_PROXY}${encodeURIComponent(url)}`;
 
 const api = axios.create({
   baseURL: API_URL,
@@ -11,6 +15,18 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Override the request method to use the CORS proxy
+const originalRequest = api.request;
+api.request = function (config: AxiosRequestConfig): Promise<any> {
+  // Only proxy API requests, not local requests
+  if (config.url && API_URL && API_URL.includes('amazonaws.com')) {
+    const fullUrl = `${API_URL}${config.url}`.replace(/\/\//g, '/');
+    config.url = getProxiedUrl(fullUrl);
+    config.baseURL = ''; // Reset baseURL as we're using full URL with proxy
+  }
+  return originalRequest.call(this, config);
+};
 
 // Add auth token to requests
 api.interceptors.request.use(async (config) => {
@@ -137,4 +153,4 @@ export const swapService = {
     const response = await api.put<ApiResponse<SwapRequest>>(`/swaps/${id}/reject`);
     return response.data;
   },
-}; 
+};

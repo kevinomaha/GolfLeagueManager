@@ -152,14 +152,28 @@ export class GolfLeagueManagerStack extends cdk.Stack {
     });
 
     // Create API Gateway
-    const api = new apigateway.RestApi(this, 'GolfLeagueManagerApi', {
-      restApiName: 'Golf League Manager API',
+    const api = new apigateway.RestApi(this, 'GolfLeagueManagerApiV2', {
+      restApiName: 'Golf League Manager API V2',
       description: 'API for managing golf league data',
       defaultCorsPreflightOptions: {
-        allowOrigins: ['https://dau89hcxeanaz.cloudfront.net'],
-        allowHeaders: ['Content-Type', 'X-Amz-Date', 'Authorization', 'X-Api-Key', 'X-Amz-Security-Token'],
-        allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowHeaders: [
+          'Content-Type',
+          'X-Amz-Date',
+          'Authorization',
+          'X-Api-Key',
+          'X-Amz-Security-Token',
+          'X-Amz-User-Agent',
+          'Access-Control-Allow-Origin',
+          'Access-Control-Allow-Headers'
+        ],
+        allowMethods: apigateway.Cors.ALL_METHODS,
         allowCredentials: true,
+        maxAge: cdk.Duration.seconds(600),
+        exposeHeaders: [
+          'Access-Control-Allow-Origin',
+          'Access-Control-Allow-Credentials'
+        ]
       },
     });
 
@@ -193,6 +207,16 @@ export class GolfLeagueManagerStack extends cdk.Stack {
       },
     });
 
+    const swapsLambda = new lambda.Function(this, 'SwapsFunction', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/swaps'),
+      environment: {
+        SWAPS_TABLE_NAME: 'SwapRequestsTable',
+        NOTIFICATION_TOPIC_ARN: notificationTopic.topicArn,
+      },
+    });
+
     // Grant DynamoDB permissions to Lambda functions
     playersTable.grantReadWriteData(playersLambda);
     scheduleTable.grantReadWriteData(scheduleLambda);
@@ -204,19 +228,25 @@ export class GolfLeagueManagerStack extends cdk.Stack {
     const authIntegration = new apigateway.LambdaIntegration(authLambda, {
       proxy: true,
       allowTestInvoke: false,
-      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
+      passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_MATCH,
     });
 
     const playersIntegration = new apigateway.LambdaIntegration(playersLambda, {
       proxy: true,
       allowTestInvoke: false,
-      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
+      passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_MATCH,
     });
 
     const scheduleIntegration = new apigateway.LambdaIntegration(scheduleLambda, {
       proxy: true,
       allowTestInvoke: false,
-      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
+      passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_MATCH,
+    });
+
+    const swapsIntegration = new apigateway.LambdaIntegration(swapsLambda, {
+      proxy: true,
+      allowTestInvoke: false,
+      passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_MATCH,
     });
 
     // Auth endpoints
@@ -242,6 +272,22 @@ export class GolfLeagueManagerStack extends cdk.Stack {
     weekResource.addMethod('GET', scheduleIntegration);
     weekResource.addMethod('PUT', scheduleIntegration);
 
+    // Swaps endpoints
+    const swapsResource = api.root.addResource('swaps');
+    swapsResource.addMethod('GET', swapsIntegration);
+    swapsResource.addMethod('POST', swapsIntegration);
+
+    const swapResource = swapsResource.addResource('{id}');
+    swapResource.addMethod('GET', swapsIntegration);
+    swapResource.addMethod('PUT', swapsIntegration);
+
+    // Add specific actions for swap approval/rejection
+    const approveResource = swapResource.addResource('approve');
+    approveResource.addMethod('PUT', swapsIntegration);
+
+    const rejectResource = swapResource.addResource('reject');
+    rejectResource.addMethod('PUT', swapsIntegration);
+
     // Output important values
     new cdk.CfnOutput(this, 'UserPoolId', {
       value: userPool.userPoolId,
@@ -263,4 +309,4 @@ export class GolfLeagueManagerStack extends cdk.Stack {
       description: 'Website S3 Bucket Name',
     });
   }
-} 
+}
