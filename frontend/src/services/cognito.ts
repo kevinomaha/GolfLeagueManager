@@ -1,9 +1,12 @@
 import { CognitoUserPool, AuthenticationDetails, CognitoUser } from 'amazon-cognito-identity-js';
 
+// Get User Pool data from environment variables
 const userPoolData = {
-  UserPoolId: 'us-east-1_7azK6A4fM', // Updated with actual User Pool ID
-  ClientId: '6ehscd1d5a7ujajlocd7vtis3u' // Updated with actual Client ID
+  UserPoolId: process.env.REACT_APP_USER_POOL_ID || '',
+  ClientId: process.env.REACT_APP_USER_POOL_WEB_CLIENT_ID || ''
 };
+
+console.log('User Pool Configuration:', userPoolData);
 
 export const userPool = new CognitoUserPool(userPoolData);
 
@@ -88,4 +91,4 @@ export const getSession = (): Promise<any> => {
       resolve(session);
     });
   });
-}; 
+};
