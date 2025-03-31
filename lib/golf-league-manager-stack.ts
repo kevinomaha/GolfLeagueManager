@@ -177,6 +177,15 @@ export class GolfLeagueManagerStack extends cdk.Stack {
       },
     });
 
+    // Create the CORS Proxy Lambda function
+    const corsProxyLambda = new lambda.Function(this, 'CorsProxyFunction', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/cors-proxy'),
+      timeout: cdk.Duration.seconds(30), // Increase timeout for proxy requests
+      memorySize: 256,
+    });
+
     // Create Lambda functions
     const authLambda = new lambda.Function(this, 'AuthFunction', {
       runtime: lambda.Runtime.NODEJS_18_X,
@@ -224,7 +233,13 @@ export class GolfLeagueManagerStack extends cdk.Stack {
     // Grant SNS permissions to schedule Lambda
     notificationTopic.grantPublish(scheduleLambda);
 
-    // Add API endpoints
+    // Add Lambda integrations for API Gateway
+    const corsProxyIntegration = new apigateway.LambdaIntegration(corsProxyLambda, {
+      proxy: true,
+      allowTestInvoke: false,
+      passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_MATCH,
+    });
+
     const authIntegration = new apigateway.LambdaIntegration(authLambda, {
       proxy: true,
       allowTestInvoke: false,
@@ -248,6 +263,22 @@ export class GolfLeagueManagerStack extends cdk.Stack {
       allowTestInvoke: false,
       passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_MATCH,
     });
+
+    // CORS Proxy endpoint
+    const proxyResource = api.root.addResource('proxy');
+    proxyResource.addMethod('GET', corsProxyIntegration);
+    proxyResource.addMethod('POST', corsProxyIntegration);
+    proxyResource.addMethod('PUT', corsProxyIntegration);
+    proxyResource.addMethod('DELETE', corsProxyIntegration);
+    proxyResource.addMethod('OPTIONS', corsProxyIntegration);
+    
+    // Add a wildcard proxy endpoint for flexibility
+    const wildcardProxyResource = proxyResource.addResource('{proxy+}');
+    wildcardProxyResource.addMethod('GET', corsProxyIntegration);
+    wildcardProxyResource.addMethod('POST', corsProxyIntegration);
+    wildcardProxyResource.addMethod('PUT', corsProxyIntegration);
+    wildcardProxyResource.addMethod('DELETE', corsProxyIntegration);
+    wildcardProxyResource.addMethod('OPTIONS', corsProxyIntegration);
 
     // Auth endpoints
     const authResource = api.root.addResource('auth');
@@ -307,6 +338,12 @@ export class GolfLeagueManagerStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'WebsiteBucketName', {
       value: websiteBucket.bucketName,
       description: 'Website S3 Bucket Name',
+    });
+    
+    // Add CORS Proxy URL output
+    new cdk.CfnOutput(this, 'CorsProxyUrl', {
+      value: `${api.url}proxy/`,
+      description: 'CORS Proxy URL',
     });
   }
 }
