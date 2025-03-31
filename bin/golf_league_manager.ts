@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
-import { GolfLeagueManagerStack } from '../lib/golf_league_manager-stack';
+import { GolfLeagueManagerStack } from '../lib/golf-league-manager-stack';
 
 const app = new cdk.App();
 new GolfLeagueManagerStack(app, 'GolfLeagueManagerStack', {
@@ -10,7 +10,7 @@ new GolfLeagueManagerStack(app, 'GolfLeagueManagerStack', {
 
   /* Uncomment the next line to specialize this stack for the AWS Account
    * and Region that are implied by the current CLI configuration. */
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
+  env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
 
   /* Uncomment the next line if you know exactly what Account and Region you
    * want to deploy the stack to. */
