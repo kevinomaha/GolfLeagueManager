@@ -5,6 +5,9 @@ import { getSession } from './cognito';
 const API_URL = process.env.REACT_APP_API_URL;
 console.log('API URL:', API_URL);
 
+// Get the current CloudFront domain
+const CLOUDFRONT_URL = process.env.REACT_APP_CLOUDFRONT_URL || 'https://du3mmbiqtjmrx.cloudfront.net';
+
 // Use a CORS proxy for API requests
 const CORS_PROXY = 'https://corsproxy.io/?';
 const getProxiedUrl = (url: string): string => `${CORS_PROXY}${encodeURIComponent(url)}`;
@@ -24,6 +27,12 @@ api.request = function (config: AxiosRequestConfig): Promise<any> {
     const fullUrl = `${API_URL}${config.url}`.replace(/\/\//g, '/');
     config.url = getProxiedUrl(fullUrl);
     config.baseURL = ''; // Reset baseURL as we're using full URL with proxy
+    
+    // Add Origin header to make it look like the request is coming from our CloudFront
+    if (!config.headers) {
+      config.headers = {};
+    }
+    config.headers['Origin'] = CLOUDFRONT_URL;
   }
   return originalRequest.call(this, config);
 };
