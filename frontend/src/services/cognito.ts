@@ -1,9 +1,18 @@
 import { CognitoUserPool, AuthenticationDetails, CognitoUser } from 'amazon-cognito-identity-js';
+import { config } from '../config';
 
-// Get User Pool data from environment variables
+// Debug output of environment variables
+console.log('Environment Variables:', {
+  REACT_APP_USER_POOL_ID: process.env.REACT_APP_USER_POOL_ID,
+  REACT_APP_USER_POOL_WEB_CLIENT_ID: process.env.REACT_APP_USER_POOL_WEB_CLIENT_ID,
+  REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+  REACT_APP_CLOUDFRONT_URL: process.env.REACT_APP_CLOUDFRONT_URL
+});
+
+// Use the centralized configuration
 const userPoolData = {
-  UserPoolId: process.env.REACT_APP_USER_POOL_ID || '',
-  ClientId: process.env.REACT_APP_USER_POOL_WEB_CLIENT_ID || ''
+  UserPoolId: config.cognito.userPoolId,
+  ClientId: config.cognito.userPoolWebClientId
 };
 
 console.log('User Pool Configuration:', userPoolData);
@@ -53,6 +62,7 @@ export const signIn = (email: string, password: string): Promise<CognitoUser> =>
         resolve(cognitoUser);
       },
       onFailure: (err) => {
+        console.error('Authentication failure:', err);
         reject(err);
       },
       newPasswordRequired: (userAttributes, requiredAttributes) => {
