@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { Player, Schedule, SwapRequest, AuthResponse, ApiResponse } from '../types';
+import { getSession } from './cognito';
 
 const API_URL = process.env.REACT_APP_API_URL;
+console.log('API URL:', API_URL);
 
 const api = axios.create({
   baseURL: API_URL,
@@ -11,13 +13,33 @@ const api = axios.create({
 });
 
 // Add auth token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+api.interceptors.request.use(async (config) => {
+  try {
+    const session = await getSession();
+    if (session) {
+      const token = session.getIdToken().getJwtToken();
+      console.log('Adding auth token to request:', token.substring(0, 20) + '...');
+      config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      console.log('No active session found');
+    }
+  } catch (error) {
+    console.error('Failed to get session:', error);
   }
   return config;
 });
+
+// Add response interceptor for logging
+api.interceptors.response.use(
+  (response) => {
+    console.log('API Response:', response.status, response.config.url);
+    return response;
+  },
+  (error) => {
+    console.error('API Error:', error.response?.status, error.config?.url, error.message);
+    return Promise.reject(error);
+  }
+);
 
 export const authService = {
   async login(email: string, password: string): Promise<ApiResponse<AuthResponse>> {

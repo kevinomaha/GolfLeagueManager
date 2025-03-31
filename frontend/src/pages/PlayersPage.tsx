@@ -27,10 +27,16 @@ export const PlayersPage: React.FC = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    email: string;
+    phoneNumber?: string;
+    percentage: number;
+  }>({
     name: '',
     email: '',
     phoneNumber: '',
+    percentage: 0,
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,6 +63,7 @@ export const PlayersPage: React.FC = () => {
         name: player.name,
         email: player.email,
         phoneNumber: player.phoneNumber,
+        percentage: player.percentage,
       });
     } else {
       setEditingPlayer(null);
@@ -64,6 +71,7 @@ export const PlayersPage: React.FC = () => {
         name: '',
         email: '',
         phoneNumber: '',
+        percentage: 0,
       });
     }
     setOpenDialog(true);
@@ -76,6 +84,7 @@ export const PlayersPage: React.FC = () => {
       name: '',
       email: '',
       phoneNumber: '',
+      percentage: 0,
     });
   };
 
@@ -98,7 +107,12 @@ export const PlayersPage: React.FC = () => {
           setError('Failed to update player');
         }
       } else {
-        const response = await playerService.createPlayer(formData);
+        const response = await playerService.createPlayer({
+          name: formData.name,
+          email: formData.email,
+          percentage: formData.percentage,
+          ...(formData.phoneNumber && { phoneNumber: formData.phoneNumber }),
+        });
         if (response.statusCode === 201) {
           handleCloseDialog();
           loadPlayers();
@@ -157,7 +171,7 @@ export const PlayersPage: React.FC = () => {
               <TableCell>Name</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Phone Number</TableCell>
-              <TableCell>Weeks Scheduled</TableCell>
+              <TableCell>Percentage</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -167,7 +181,7 @@ export const PlayersPage: React.FC = () => {
                 <TableCell>{player.name}</TableCell>
                 <TableCell>{player.email}</TableCell>
                 <TableCell>{player.phoneNumber}</TableCell>
-                <TableCell>{player.weeksScheduled.length}</TableCell>
+                <TableCell>{player.percentage}%</TableCell>
                 <TableCell align="right">
                   <Tooltip title="Edit">
                     <IconButton onClick={() => handleOpenDialog(player)}>

@@ -8,14 +8,39 @@ const docClient = DynamoDBDocumentClient.from(dynamoClient);
 const cognitoClient = new CognitoIdentityProviderClient({});
 const snsClient = new SNSClient({});
 
-export const handler = async (event: any) => {
-  const { httpMethod, path, headers } = event;
-  const authorization = headers.Authorization || headers.authorization;
+// CORS headers that will be included in all responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': 'https://dau89hcxeanaz.cloudfront.net',
+  'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+  'Access-Control-Allow-Credentials': 'true'
+};
 
+export const handler = async (event: any) => {
+  console.log('Event:', JSON.stringify(event));
+  
+  const { httpMethod, path, headers } = event;
+  
+  // Handle OPTIONS requests immediately
+  if (httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: '',
+    };
+  }
+  
+  const authorization = headers?.Authorization || headers?.authorization;
+
+  // Check authentication (except for OPTIONS which we already handled)
   if (!authorization) {
     return {
       statusCode: 401,
-      body: JSON.stringify({ message: 'Unauthorized' }),
+      headers: corsHeaders,
+      body: JSON.stringify({
+        statusCode: 401,
+        body: { message: 'Unauthorized' }
+      }),
     };
   }
 
@@ -31,7 +56,7 @@ export const handler = async (event: any) => {
         if (path === '/schedule') {
           // Get all weeks
           const queryCommand = new QueryCommand({
-            TableName: 'ScheduleTable',
+            TableName: 'GolfLeagueManagerStack-ScheduleTable6DED49F5-694JWNA8A468',
             KeyConditionExpression: 'weekId BETWEEN :start AND :end',
             ExpressionAttributeValues: {
               ':start': '2024-04-28',
@@ -41,13 +66,17 @@ export const handler = async (event: any) => {
           const result = await docClient.send(queryCommand);
           return {
             statusCode: 200,
-            body: JSON.stringify(result.Items),
+            headers: corsHeaders,
+            body: JSON.stringify({
+              statusCode: 200,
+              body: result.Items || []
+            })
           };
         } else if (path.startsWith('/schedule/')) {
           // Get specific week
           const weekId = path.split('/')[2];
           const queryCommand = new QueryCommand({
-            TableName: 'ScheduleTable',
+            TableName: 'GolfLeagueManagerStack-ScheduleTable6DED49F5-694JWNA8A468',
             KeyConditionExpression: 'weekId = :weekId',
             ExpressionAttributeValues: {
               ':weekId': weekId,
@@ -56,7 +85,11 @@ export const handler = async (event: any) => {
           const result = await docClient.send(queryCommand);
           return {
             statusCode: 200,
-            body: JSON.stringify(result.Items),
+            headers: corsHeaders,
+            body: JSON.stringify({
+              statusCode: 200,
+              body: result.Items || []
+            })
           };
         }
         break;
@@ -68,7 +101,7 @@ export const handler = async (event: any) => {
 
           // Create schedule entry
           const putCommand = new PutCommand({
-            TableName: 'ScheduleTable',
+            TableName: 'GolfLeagueManagerStack-ScheduleTable6DED49F5-694JWNA8A468',
             Item: {
               weekId,
               playerId,
@@ -93,7 +126,11 @@ export const handler = async (event: any) => {
 
           return {
             statusCode: 201,
-            body: JSON.stringify({ message: 'Schedule created successfully' }),
+            headers: corsHeaders,
+            body: JSON.stringify({
+              statusCode: 201,
+              body: { message: 'Schedule created successfully' }
+            }),
           };
         }
         break;
@@ -105,7 +142,7 @@ export const handler = async (event: any) => {
           
           // Update schedule entry
           const updateCommand = new UpdateCommand({
-            TableName: 'ScheduleTable',
+            TableName: 'GolfLeagueManagerStack-ScheduleTable6DED49F5-694JWNA8A468',
             Key: {
               weekId,
               playerId: updates.playerId,
@@ -136,7 +173,11 @@ export const handler = async (event: any) => {
 
           return {
             statusCode: 200,
-            body: JSON.stringify({ message: 'Schedule updated successfully' }),
+            headers: corsHeaders,
+            body: JSON.stringify({
+              statusCode: 200,
+              body: { message: 'Schedule updated successfully' }
+            }),
           };
         }
         break;
@@ -144,17 +185,36 @@ export const handler = async (event: any) => {
       default:
         return {
           statusCode: 405,
-          body: JSON.stringify({ message: 'Method not allowed' }),
+          headers: corsHeaders,
+          body: JSON.stringify({
+            statusCode: 405,
+            body: { message: 'Method not allowed' }
+          }),
         };
     }
+    
+    // If we reach here, it means no handler matched
+    return {
+      statusCode: 404,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        statusCode: 404,
+        body: { message: 'Resource not found' }
+      }),
+    };
+    
   } catch (error) {
     console.error('Error:', error);
     return {
       statusCode: 500,
+      headers: corsHeaders,
       body: JSON.stringify({
-        message: 'Internal server error',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        statusCode: 500,
+        body: {
+          message: 'Internal server error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }
       }),
     };
   }
-}; 
+};

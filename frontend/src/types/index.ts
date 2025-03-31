@@ -2,8 +2,8 @@ export interface Player {
   id: string;
   name: string;
   email: string;
-  phoneNumber: string;
-  weeksScheduled: string[];
+  phoneNumber?: string;
+  percentage: number;
 }
 
 export interface Schedule {
@@ -18,7 +18,7 @@ export interface SwapRequest {
   weekId: string;
   requestingPlayerId: string;
   targetPlayerId: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
   createdAt: string;
   updatedAt?: string;
 }
@@ -34,5 +34,6 @@ export interface AuthResponse {
 export interface ApiResponse<T> {
   statusCode: number;
   body: T;
-  headers?: Record<string, string>;
+  message?: string;
+  error?: string;
 } 

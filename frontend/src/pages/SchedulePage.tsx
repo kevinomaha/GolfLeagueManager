@@ -34,6 +34,23 @@ export const SchedulePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Define the dates for the golf league
+  const dates = [
+    { date: '2024-04-28', label: '28-Apr' },
+    { date: '2024-05-05', label: '05-May' },
+    { date: '2024-05-12', label: '12-May' },
+    { date: '2024-05-19', label: '19-May' },
+    { date: '2024-05-26', label: 'No Play', special: 'Memorial Day' },
+    { date: '2024-07-02', label: '02-Jul' },
+    { date: '2024-07-09', label: '09-Jul' },
+    { date: '2024-07-16', label: '16-Jul' },
+    { date: '2024-07-23', label: '23-Jul', special: 'Position Night' },
+    { date: '2024-07-30', label: '30-Jul' },
+    { date: '2024-08-07', label: '07-Aug' },
+    { date: '2024-08-14', label: '14-Aug' },
+    { date: '2024-08-18', label: '18-Aug', special: 'Champion Round' },
+  ];
+
   useEffect(() => {
     loadData();
   }, []);
@@ -99,14 +116,21 @@ export const SchedulePage: React.FC = () => {
     }
   };
 
+  const isPlayerScheduled = (playerId: string, date: string) => {
+    return schedules.some(
+      (schedule) => schedule.playerId === playerId && schedule.weekId === date
+    );
+  };
+
+  const getTotalPlayers = (date: string) => {
+    return schedules.filter((schedule) => schedule.weekId === date).length;
+  };
+
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4">Schedule</Typography>
-        <Button variant="contained" onClick={handleOpenDialog}>
-          Add Schedule
-        </Button>
-      </Box>
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h4" gutterBottom>
+        Golf League Schedule
+      </Typography>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -115,27 +139,61 @@ export const SchedulePage: React.FC = () => {
       )}
 
       <TableContainer component={Paper}>
-        <Table>
+        <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>Week</TableCell>
-              <TableCell>Player</TableCell>
-              <TableCell>Time</TableCell>
-              <TableCell>Course</TableCell>
+              <TableCell>Name</TableCell>
+              {dates.map((date) => (
+                <TableCell key={date.date} align="center">
+                  {date.label}
+                  {date.special && (
+                    <Typography variant="caption" display="block">
+                      {date.special}
+                    </Typography>
+                  )}
+                </TableCell>
+              ))}
             </TableRow>
           </TableHead>
           <TableBody>
-            {schedules.map((schedule) => {
-              const player = players.find((p) => p.id === schedule.playerId);
-              return (
-                <TableRow key={`${schedule.weekId}-${schedule.playerId}`}>
-                  <TableCell>{format(new Date(schedule.weekId), 'MMM dd, yyyy')}</TableCell>
-                  <TableCell>{player?.name || 'Unknown Player'}</TableCell>
-                  <TableCell>{schedule.time}</TableCell>
-                  <TableCell>{schedule.course}</TableCell>
-                </TableRow>
-              );
-            })}
+            {players.map((player) => (
+              <TableRow key={player.id}>
+                <TableCell component="th" scope="row">
+                  {player.name} ({player.percentage}%)
+                </TableCell>
+                {dates.map((date) => (
+                  <TableCell
+                    key={`${player.id}-${date.date}`}
+                    align="center"
+                    sx={{
+                      backgroundColor: date.special === 'Memorial Day' ? '#f5f5f5' : 'inherit',
+                    }}
+                  >
+                    {isPlayerScheduled(player.id, date.date) ? '1' : ''}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+            <TableRow>
+              <TableCell>Total Players</TableCell>
+              {dates.map((date) => (
+                <TableCell key={`total-${date.date}`} align="center">
+                  {getTotalPlayers(date.date)}
+                </TableCell>
+              ))}
+            </TableRow>
+            <TableRow>
+              <TableCell>Tee Time</TableCell>
+              {dates.map((date) => (
+                <TableCell key={`tee-${date.date}`} align="center"></TableCell>
+              ))}
+            </TableRow>
+            <TableRow>
+              <TableCell>Front/Back</TableCell>
+              {dates.map((date) => (
+                <TableCell key={`course-${date.date}`} align="center"></TableCell>
+              ))}
+            </TableRow>
           </TableBody>
         </Table>
       </TableContainer>

@@ -8,14 +8,39 @@ const docClient = DynamoDBDocumentClient.from(dynamoClient);
 const cognitoClient = new CognitoIdentityProviderClient({});
 const snsClient = new SNSClient({});
 
-export const handler = async (event: any) => {
-  const { httpMethod, path, headers } = event;
-  const authorization = headers.Authorization || headers.authorization;
+// CORS headers that will be included in all responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': 'https://dau89hcxeanaz.cloudfront.net',
+  'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+  'Access-Control-Allow-Credentials': 'true'
+};
 
+export const handler = async (event: any) => {
+  console.log('Event:', JSON.stringify(event));
+  
+  const { httpMethod, path, headers } = event;
+  
+  // Handle OPTIONS requests immediately
+  if (httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: '',
+    };
+  }
+  
+  const authorization = headers?.Authorization || headers?.authorization;
+
+  // Check authentication (except for OPTIONS which we already handled)
   if (!authorization) {
     return {
       statusCode: 401,
-      body: JSON.stringify({ message: 'Unauthorized' }),
+      headers: corsHeaders,
+      body: JSON.stringify({
+        statusCode: 401,
+        body: { message: 'Unauthorized' }
+      }),
     };
   }
 
@@ -40,7 +65,11 @@ export const handler = async (event: any) => {
           const result = await docClient.send(queryCommand);
           return {
             statusCode: 200,
-            body: JSON.stringify(result.Items),
+            headers: corsHeaders,
+            body: JSON.stringify({
+              statusCode: 200,
+              body: result.Items
+            }),
           };
         } else if (path.startsWith('/swaps/')) {
           // Get specific swap request
@@ -52,7 +81,11 @@ export const handler = async (event: any) => {
           const result = await docClient.send(getCommand);
           return {
             statusCode: 200,
-            body: JSON.stringify(result.Item),
+            headers: corsHeaders,
+            body: JSON.stringify({
+              statusCode: 200,
+              body: result.Item
+            }),
           };
         }
         break;
@@ -91,7 +124,11 @@ export const handler = async (event: any) => {
 
           return {
             statusCode: 201,
-            body: JSON.stringify({ message: 'Swap request created successfully' }),
+            headers: corsHeaders,
+            body: JSON.stringify({
+              statusCode: 201,
+              body: { message: 'Swap request created successfully' }
+            }),
           };
         }
         break;
@@ -122,18 +159,30 @@ export const handler = async (event: any) => {
               TableName: 'SwapRequestsTable',
               Key: { id: swapId },
             });
-            const swapRequest = await docClient.send(getCommand);
+            const swapResult = await docClient.send(getCommand);
+            const swapItem = swapResult.Item;
+            
+            if (!swapItem) {
+              return {
+                statusCode: 404,
+                headers: corsHeaders,
+                body: JSON.stringify({
+                  statusCode: 404,
+                  body: { message: 'Swap request not found' }
+                }),
+              };
+            }
 
             // Update schedule entries
             const scheduleUpdateCommand = new UpdateCommand({
               TableName: 'ScheduleTable',
               Key: {
-                weekId: swapRequest.Item.weekId,
-                playerId: swapRequest.Item.requestingPlayerId,
+                weekId: swapItem.weekId,
+                playerId: swapItem.requestingPlayerId,
               },
               UpdateExpression: 'SET playerId = :playerId',
               ExpressionAttributeValues: {
-                ':playerId': swapRequest.Item.targetPlayerId,
+                ':playerId': swapItem.targetPlayerId,
               },
             });
             await docClient.send(scheduleUpdateCommand);
@@ -144,9 +193,9 @@ export const handler = async (event: any) => {
               Message: JSON.stringify({
                 type: 'SWAP_ACCEPTED',
                 swapId,
-                weekId: swapRequest.Item.weekId,
-                requestingPlayerId: swapRequest.Item.requestingPlayerId,
-                targetPlayerId: swapRequest.Item.targetPlayerId,
+                weekId: swapItem.weekId,
+                requestingPlayerId: swapItem.requestingPlayerId,
+                targetPlayerId: swapItem.targetPlayerId,
               }),
             });
             await snsClient.send(publishCommand);
@@ -154,7 +203,11 @@ export const handler = async (event: any) => {
 
           return {
             statusCode: 200,
-            body: JSON.stringify({ message: 'Swap request updated successfully' }),
+            headers: corsHeaders,
+            body: JSON.stringify({
+              statusCode: 200,
+              body: { message: 'Swap request updated successfully' }
+            }),
           };
         }
         break;
@@ -162,17 +215,36 @@ export const handler = async (event: any) => {
       default:
         return {
           statusCode: 405,
-          body: JSON.stringify({ message: 'Method not allowed' }),
+          headers: corsHeaders,
+          body: JSON.stringify({
+            statusCode: 405,
+            body: { message: 'Method not allowed' }
+          }),
         };
     }
+    
+    // If we reach here, it means no handler matched
+    return {
+      statusCode: 404,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        statusCode: 404,
+        body: { message: 'Resource not found' }
+      }),
+    };
+    
   } catch (error) {
     console.error('Error:', error);
     return {
       statusCode: 500,
+      headers: corsHeaders,
       body: JSON.stringify({
-        message: 'Internal server error',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        statusCode: 500,
+        body: {
+          message: 'Internal server error',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }
       }),
     };
   }
-}; 
+};

@@ -63,8 +63,14 @@ export class GolfLeagueManagerStack extends cdk.Stack {
           cognito.OAuthScope.OPENID,
           cognito.OAuthScope.PROFILE,
         ],
-        callbackUrls: ['http://localhost:3000'],
-        logoutUrls: ['http://localhost:3000/login'],
+        callbackUrls: [
+          'http://localhost:3000',
+          'https://dau89hcxeanaz.cloudfront.net'
+        ],
+        logoutUrls: [
+          'http://localhost:3000/login',
+          'https://dau89hcxeanaz.cloudfront.net/login'
+        ],
       },
       accessTokenValidity: cdk.Duration.days(1),
       idTokenValidity: cdk.Duration.days(1),
@@ -146,13 +152,14 @@ export class GolfLeagueManagerStack extends cdk.Stack {
     });
 
     // Create API Gateway
-    const api = new apigateway.RestApi(this, 'GolfLeagueApi', {
-      restApiName: 'Golf League API',
-      description: 'API for Golf League Management',
+    const api = new apigateway.RestApi(this, 'GolfLeagueManagerApi', {
+      restApiName: 'Golf League Manager API',
+      description: 'API for managing golf league data',
       defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
-        allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
+        allowOrigins: ['https://dau89hcxeanaz.cloudfront.net'],
+        allowHeaders: ['Content-Type', 'X-Amz-Date', 'Authorization', 'X-Api-Key', 'X-Amz-Security-Token'],
+        allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowCredentials: true,
       },
     });
 
@@ -163,13 +170,77 @@ export class GolfLeagueManagerStack extends cdk.Stack {
       code: lambda.Code.fromAsset('lambda/auth'),
       environment: {
         USER_POOL_ID: userPool.userPoolId,
-        USER_POOL_CLIENT_ID: userPool.addClient('GolfLeagueClient').userPoolClientId,
+        USER_POOL_CLIENT_ID: userPoolClient.userPoolClientId,
       },
     });
 
+    const playersLambda = new lambda.Function(this, 'PlayersFunction', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/players'),
+      environment: {
+        PLAYERS_TABLE_NAME: playersTable.tableName,
+      },
+    });
+
+    const scheduleLambda = new lambda.Function(this, 'ScheduleFunction', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/schedule'),
+      environment: {
+        SCHEDULE_TABLE_NAME: scheduleTable.tableName,
+        NOTIFICATION_TOPIC_ARN: notificationTopic.topicArn,
+      },
+    });
+
+    // Grant DynamoDB permissions to Lambda functions
+    playersTable.grantReadWriteData(playersLambda);
+    scheduleTable.grantReadWriteData(scheduleLambda);
+
+    // Grant SNS permissions to schedule Lambda
+    notificationTopic.grantPublish(scheduleLambda);
+
     // Add API endpoints
-    const authIntegration = new apigateway.LambdaIntegration(authLambda);
-    api.root.addResource('auth').addMethod('POST', authIntegration);
+    const authIntegration = new apigateway.LambdaIntegration(authLambda, {
+      proxy: true,
+      allowTestInvoke: false,
+      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
+    });
+
+    const playersIntegration = new apigateway.LambdaIntegration(playersLambda, {
+      proxy: true,
+      allowTestInvoke: false,
+      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
+    });
+
+    const scheduleIntegration = new apigateway.LambdaIntegration(scheduleLambda, {
+      proxy: true,
+      allowTestInvoke: false,
+      passthroughBehavior: apigateway.PassthroughBehavior.NEVER,
+    });
+
+    // Auth endpoints
+    const authResource = api.root.addResource('auth');
+    authResource.addMethod('POST', authIntegration);
+
+    // Players endpoints
+    const playersResource = api.root.addResource('players');
+    playersResource.addMethod('GET', playersIntegration);
+    playersResource.addMethod('POST', playersIntegration);
+
+    const playerResource = playersResource.addResource('{id}');
+    playerResource.addMethod('GET', playersIntegration);
+    playerResource.addMethod('PUT', playersIntegration);
+    playerResource.addMethod('DELETE', playersIntegration);
+
+    // Schedule endpoints
+    const scheduleResource = api.root.addResource('schedule');
+    scheduleResource.addMethod('GET', scheduleIntegration);
+    scheduleResource.addMethod('POST', scheduleIntegration);
+
+    const weekResource = scheduleResource.addResource('{weekId}');
+    weekResource.addMethod('GET', scheduleIntegration);
+    weekResource.addMethod('PUT', scheduleIntegration);
 
     // Output important values
     new cdk.CfnOutput(this, 'UserPoolId', {
