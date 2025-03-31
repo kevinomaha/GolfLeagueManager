@@ -264,20 +264,37 @@ export class GolfLeagueManagerStack extends cdk.Stack {
       passthroughBehavior: apigateway.PassthroughBehavior.WHEN_NO_MATCH,
     });
 
-    // CORS Proxy endpoint
-    const proxyResource = api.root.addResource('proxy');
+    // CORS Proxy endpoint with proper CORS handling
+    const proxyResource = api.root.addResource('proxy', {
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowCredentials: true
+      }
+    });
+    
+    // Add methods but no OPTIONS (handled by defaultCorsPreflightOptions)
     proxyResource.addMethod('GET', corsProxyIntegration);
     proxyResource.addMethod('POST', corsProxyIntegration);
     proxyResource.addMethod('PUT', corsProxyIntegration);
     proxyResource.addMethod('DELETE', corsProxyIntegration);
     
-    // Add a wildcard proxy endpoint for flexibility
-    const wildcardProxyResource = proxyResource.addResource('{proxy+}');
+    // Add a wildcard proxy endpoint with proper CORS handling
+    const wildcardProxyResource = proxyResource.addResource('{proxy+}', {
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowHeaders: apigateway.Cors.DEFAULT_HEADERS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowCredentials: true
+      }
+    });
+    
+    // Add methods but no OPTIONS (handled by defaultCorsPreflightOptions)
     wildcardProxyResource.addMethod('GET', corsProxyIntegration);
     wildcardProxyResource.addMethod('POST', corsProxyIntegration);
     wildcardProxyResource.addMethod('PUT', corsProxyIntegration);
     wildcardProxyResource.addMethod('DELETE', corsProxyIntegration);
-    wildcardProxyResource.addMethod('OPTIONS', corsProxyIntegration);
 
     // Auth endpoints
     const authResource = api.root.addResource('auth');
