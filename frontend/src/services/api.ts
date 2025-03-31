@@ -8,9 +8,19 @@ console.log('API URL:', API_URL);
 // Get the current CloudFront domain
 const CLOUDFRONT_URL = process.env.REACT_APP_CLOUDFRONT_URL || 'https://du3mmbiqtjmrx.cloudfront.net';
 
-// Use a CORS proxy for API requests
-const CORS_PROXY = 'https://corsproxy.io/?';
-const getProxiedUrl = (url: string): string => `${CORS_PROXY}${encodeURIComponent(url)}`;
+// Use our AWS CORS proxy for API requests (instead of corsproxy.io)
+// Format: https://[API_GATEWAY_URL]/proxy/[TARGET_URL]
+const getProxiedUrl = (url: string): string => {
+  // Extract the API Gateway base URL without the trailing slash
+  const apiGatewayBase = API_URL ? API_URL.replace(/\/+$/, '') : '';
+  
+  // Get the API path (everything after the base URL)
+  const apiPath = url.replace(apiGatewayBase, '');
+  
+  // Create the proxy URL: API Gateway URL + /proxy/ + target path
+  const proxyBase = apiGatewayBase.replace(/\/prod$/, '');
+  return `${proxyBase}/prod/proxy?url=${encodeURIComponent(url)}`;
+};
 
 const api = axios.create({
   baseURL: API_URL,
@@ -24,8 +34,14 @@ const originalRequest = api.request;
 api.request = function (config: AxiosRequestConfig): Promise<any> {
   // Only proxy API requests, not local requests
   if (config.url && API_URL && API_URL.includes('amazonaws.com')) {
+    // Create the full original URL
     const fullUrl = `${API_URL}${config.url}`.replace(/\/\//g, '/');
+    console.log('Original URL:', fullUrl);
+    
+    // Replace with proxied URL
     config.url = getProxiedUrl(fullUrl);
+    console.log('Proxied URL:', config.url);
+    
     config.baseURL = ''; // Reset baseURL as we're using full URL with proxy
     
     // Add Origin header to make it look like the request is coming from our CloudFront

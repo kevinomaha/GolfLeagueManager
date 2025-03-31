@@ -270,7 +270,6 @@ export class GolfLeagueManagerStack extends cdk.Stack {
     proxyResource.addMethod('POST', corsProxyIntegration);
     proxyResource.addMethod('PUT', corsProxyIntegration);
     proxyResource.addMethod('DELETE', corsProxyIntegration);
-    proxyResource.addMethod('OPTIONS', corsProxyIntegration);
     
     // Add a wildcard proxy endpoint for flexibility
     const wildcardProxyResource = proxyResource.addResource('{proxy+}');
